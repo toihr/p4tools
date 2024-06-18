@@ -7,7 +7,7 @@ __all__ = ['LOGGER', 'execute_in_parallel', 'fan_id_generator', 'blotch_id_gener
 
 # %% ../../notebooks/05_production.catalog.ipynb 2
 # other imports
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import pandas as pd
 import logging
 import itertools
@@ -642,13 +642,7 @@ class ReleaseManager:
             total = len(self.obsids)
             #adding 1 to the loop amount is important to finish up the leftovers that dont fit in total/n_workers
             # Example total = 10; n_workers = 3 => 10/3 = 3 meaning 3 loops until 0:3, 3:6, 6:9 , missing the last one 10
-            loop_full = int(np.floor(total/n_workers)) + 1 
-            for i in tqdm(range(loop_full)):
-                try: 
-                    temp_obsids = self.obsids[3*i:3*i+3]
-                except:
-                    temp_obsids = self.obsids[3*i:]
-                _ = cluster_obsid_parallel(temp_obsids, self.catalog, self.dbname)
+            _ = cluster_obsid_parallel(self.todo, self.catalog, self.dbname)
     
             # create marking_ids
             fan_id = fan_id_generator()
@@ -660,24 +654,14 @@ class ReleaseManager:
 
             # fnotch and apply cuts
             LOGGER.info("Start fnotching")
-            for i in tqdm(range(loop_full)):
-                try: 
-                    temp_obsids = self.obsids[3*i:3*i+3]
-                except:
-                    temp_obsids = self.obsids[3*i:]
-                _ = fnotch_obsid_parallel(temp_obsids, self.catalog)
+            _ = fnotch_obsid_parallel(self.todo, self.catalog)
 
         # create summary CSV files of the clustering output
         LOGGER.info("Creating L1C fan and blotch database files.")
         create_roi_file(self.obsids, self.catalog, self.catalog)
 
         LOGGER.info("Creating the required RED45 mosaics for ground projections.")
-        for i in tqdm(range(loop_full)):
-            try: 
-                temp_obsids = self.obsids[3*i:3*i+3]
-            except:
-                temp_obsids = self.obsids[3*i:]
-            _ = execute_in_parallel(create_RED45_mosaic, temp_obsids)
+        _ = execute_in_parallel(create_RED45_mosaic, self.todo)
 
         LOGGER.info("Calculating the center ground coordinates for all P4 tiles.")
         self.calc_tile_coordinates()
